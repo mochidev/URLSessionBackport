@@ -1,0 +1,36 @@
+name: Test URLSessionBackport
+
+on:
+  pull_request:
+    branches:
+    - main
+
+jobs:
+  Test:
+    runs-on: macos-11
+    timeout-minutes: 10
+    steps:
+    - name: Checkout Source
+      uses: actions/checkout@v2
+
+    - name: Use Xcode 13.2
+      run: |
+        sudo xcode-select -s /Applications/Xcode_13.2.app/Contents/Developer
+
+    # Test on a version that requires the backported code
+    - name: Build macOS 11 Debug
+      run: |
+        swift build --build-tests --enable-index-store --configuration debug -Xswiftc -warnings-as-errors -Xcc -Werror
+
+    - name: Run macOS 11 Tests
+      run: |
+        swift test --skip-build --enable-index-store --configuration debug
+
+#    - name: Build macOS 11 Release
+#      run: |
+#        swift build --enable-index-store --configuration release -Xswiftc -warnings-as-errors -Xcc -Werror
+
+    # Test on a version that supports the native URLSession
+    - name: Build and Run iOS 15 Tests
+      run: |
+        xcodebuild test -destination 'name=iPhone 13' -scheme 'URLSessionBackport-Package'
