@@ -20,7 +20,7 @@ jobs:
     # Test on a version that requires the backported code
     - name: Build macOS 11 Debug
       run: |
-        swift build --build-tests --enable-index-store --configuration debug -Xswiftc -warnings-as-errors -Xcc -Werror
+        swift build --build-tests --enable-index-store --configuration debug -Xswiftc -warnings-as-errors -Xcc -Werror -Xlinker -rpath -Xlinker $(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.5/macosx
 
     - name: Run macOS 11 Tests
       run: |
@@ -33,4 +33,4 @@ jobs:
     # Test on a version that supports the native URLSession
     - name: Build and Run iOS 15 Tests
       run: |
-        xcodebuild test -destination 'name=iPhone 13' -scheme 'URLSessionBackport-Package'
+        xcodebuild test -destination 'name=iPhone 13' -scheme 'URLSessionBackport'
