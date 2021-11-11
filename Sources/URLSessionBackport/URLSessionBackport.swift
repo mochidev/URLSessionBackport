@@ -375,7 +375,7 @@ extension URLSession.Backport.Delegate: URLSessionDelegate {
         }
     }
     
-    @available(macOS 11.0, iOS 15.0, watchOS 7.0, *)
+    @available(macOS 11.0, *)
     func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
         originalDelegate?.urlSessionDidFinishEvents?(forBackgroundURLSession: session)
     }
