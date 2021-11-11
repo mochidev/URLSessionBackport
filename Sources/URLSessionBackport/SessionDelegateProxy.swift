@@ -10,26 +10,8 @@ import Foundation
 
 #if compiler(>=5.5.2)
 class SessionDelegateProxy: NSObject {
-    struct TaskDelegate {
-        weak var task: URLSessionTask? {
-            didSet {
-                if task == nil {
-                    delegate = nil
-                    dataAccumulator = nil
-                }
-            }
-        }
-        var delegate: URLSessionTaskDelegate?
-        var dataAccumulator: DataAccumulator?
-        
-        var dataDelegate: URLSessionDataDelegate? { delegate as? URLSessionDataDelegate }
-        var downloadDelegate: URLSessionDownloadDelegate? { delegate as? URLSessionDownloadDelegate }
-        var streamDelegate: URLSessionStreamDelegate? { delegate as? URLSessionStreamDelegate }
-        var webSocketDelegate: URLSessionWebSocketDelegate? { delegate as? URLSessionWebSocketDelegate }
-    }
-    
     var originalDelegate: URLSessionDelegate?
-    var taskMap: [Int : TaskDelegate] = [:]
+    var taskMap: [Int : TaskDelegateHandler] = [:]
     
     init(originalDelegate: URLSessionDelegate?) {
         self.originalDelegate = originalDelegate
@@ -41,7 +23,7 @@ class SessionDelegateProxy: NSObject {
     ///   - delegate: The delegate for the task.
     func addTaskDelegate(task: URLSessionTask, delegate: URLSessionTaskDelegate?, dataAccumulator: DataAccumulator? = nil, onResponse: ((URLSessionDataTask, DataAccumulator, Result<URLResponse, Error>) -> Void)? = nil) {
         dataAccumulator?.onResponse = onResponse
-        taskMap[task.taskIdentifier] = TaskDelegate(task: task, delegate: delegate, dataAccumulator: dataAccumulator)
+        taskMap[task.taskIdentifier] = TaskDelegateHandler(task: task, delegate: delegate, dataAccumulator: dataAccumulator)
     }
     
     /// Remove a task delegate when the task is finished.
