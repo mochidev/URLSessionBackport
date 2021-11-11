@@ -69,7 +69,12 @@ extension UnsafeContinuation {
 }
 
 extension URLSession.Backport {
-    func addTaskDelegate(task: URLSessionTask, delegate: URLSessionTaskDelegate?, _ function: String = #function) {
+    /// Resume a task, and schedule the delegate to receive callbacks through the backported proxy.
+    /// - Parameters:
+    ///   - task: The task to resume.
+    ///   - delegate: The delegate to schedule, if provided.
+    ///   - function: The calling function, for logging purposes.
+    func resume(_ task: URLSessionTask, with delegate: URLSessionTaskDelegate?, _ function: String = #function) {
         if let delegate = delegate {
             if let sessionDelegate = session.delegate as? SessionDelegateProxy {
                 sessionDelegate.addTaskDelegate(task: task, delegate: delegate)
@@ -79,6 +84,8 @@ extension URLSession.Backport {
                 #endif
             }
         }
+        
+        task.resume()
     }
 }
 
@@ -94,9 +101,7 @@ extension URLSession.Backport {
             return try await session.data(for: request, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
-                let task = session.dataTask(with: request, completionHandler: continuation.taskCompletionHandler)
-                addTaskDelegate(task: task, delegate: delegate)
-                task.resume()
+                resume(session.dataTask(with: request, completionHandler: continuation.taskCompletionHandler), with: delegate)
             }
         }
     }
@@ -111,9 +116,7 @@ extension URLSession.Backport {
             return try await session.data(from: url, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
-                let task = session.dataTask(with: url, completionHandler: continuation.taskCompletionHandler)
-                addTaskDelegate(task: task, delegate: delegate)
-                task.resume()
+                resume(session.dataTask(with: url, completionHandler: continuation.taskCompletionHandler), with: delegate)
             }
         }
     }
@@ -129,9 +132,7 @@ extension URLSession.Backport {
             return try await session.upload(for: request, fromFile: fileURL, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
-                let task = session.uploadTask(with: request, fromFile: fileURL, completionHandler: continuation.taskCompletionHandler)
-                addTaskDelegate(task: task, delegate: delegate)
-                task.resume()
+                resume(session.uploadTask(with: request, fromFile: fileURL, completionHandler: continuation.taskCompletionHandler), with: delegate)
             }
         }
     }
@@ -147,9 +148,7 @@ extension URLSession.Backport {
             return try await session.upload(for: request, from: bodyData, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
-                let task = session.uploadTask(with: request, from: bodyData, completionHandler: continuation.taskCompletionHandler)
-                addTaskDelegate(task: task, delegate: delegate)
-                task.resume()
+                resume(session.uploadTask(with: request, from: bodyData, completionHandler: continuation.taskCompletionHandler), with: delegate)
             }
         }
     }
@@ -164,9 +163,7 @@ extension URLSession.Backport {
             return try await session.download(for: request, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
-                let task = session.downloadTask(with: request, completionHandler: continuation.taskCompletionHandler)
-                addTaskDelegate(task: task, delegate: delegate)
-                task.resume()
+                resume(session.downloadTask(with: request, completionHandler: continuation.taskCompletionHandler), with: delegate)
             }
         }
     }
@@ -181,9 +178,7 @@ extension URLSession.Backport {
             return try await session.download(from: url, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
-                let task = session.downloadTask(with: url, completionHandler: continuation.taskCompletionHandler)
-                addTaskDelegate(task: task, delegate: delegate)
-                task.resume()
+                resume(session.downloadTask(with: url, completionHandler: continuation.taskCompletionHandler), with: delegate)
             }
         }
     }
@@ -198,9 +193,7 @@ extension URLSession.Backport {
             return try await session.download(resumeFrom: resumeData, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
-                let task = session.downloadTask(withResumeData: resumeData, completionHandler: continuation.taskCompletionHandler)
-                addTaskDelegate(task: task, delegate: delegate)
-                task.resume()
+                resume(session.downloadTask(withResumeData: resumeData, completionHandler: continuation.taskCompletionHandler), with: delegate)
             }
         }
     }
