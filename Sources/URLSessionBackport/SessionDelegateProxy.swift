@@ -9,6 +9,9 @@
 import Foundation
 
 #if compiler(>=5.5.2)
+/// A delegate proxy for the real URLSession's delegate.
+///
+/// This class forwards all delegate methods supported pre iOS15/macOS 12 to both the underlying session delegate and any assigned task delegates, consisting of the majority of the backporting work.
 class SessionDelegateProxy: NSObject {
     var originalDelegate: URLSessionDelegate?
     var taskMap: [Int : TaskDelegateHandler] = [:]
