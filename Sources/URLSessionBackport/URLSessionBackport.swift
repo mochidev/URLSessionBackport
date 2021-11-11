@@ -345,6 +345,28 @@ extension URLSession.Backport {
             }
         }
     }
+
+    /// AsyncBytes conforms to AsyncSequence for data delivery. The sequence is single pass. Delegate will not be called for response and data delivery.
+    public struct AsyncBytes : AsyncSequence {
+        
+        /// Underlying data task providing the bytes.
+        internal(set) public var task: URLSessionDataTask
+        
+        public typealias Element = UInt8
+        public typealias AsyncIterator = Iterator
+        
+        @frozen public struct Iterator : AsyncIteratorProtocol {
+            public typealias Element = UInt8
+            
+            @inlinable public mutating func next() async throws -> UInt8? {
+                return nil
+            }
+        }
+        
+        public func makeAsyncIterator() -> Iterator {
+            Iterator()
+        }
+    }
 }
 
 // MARK: - Delegate Proxies
