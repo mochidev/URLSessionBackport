@@ -69,6 +69,20 @@ extension UnsafeContinuation {
 }
 
 extension URLSession.Backport {
+    func addTaskDelegate(task: URLSessionTask, delegate: URLSessionTaskDelegate?, _ function: String = #function) {
+        if let delegate = delegate {
+            if let sessionDelegate = session.delegate as? SessionDelegateProxy {
+                sessionDelegate.addTaskDelegate(task: task, delegate: delegate)
+            } else {
+                #if DEBUG
+                print("Runtime Warning: You provided a delegate to \(function), but did not initialize the URLSession with `URLSession.backport(configuration:delegate:delegateQueue:)`, which is necessary to proxy the delegate methods properly.")
+                #endif
+            }
+        }
+    }
+}
+
+extension URLSession.Backport {
     
     /// Backported convenience method to load data using an URLRequest, creates and resumes an URLSessionDataTask internally.
     ///
@@ -81,17 +95,7 @@ extension URLSession.Backport {
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
                 let task = session.dataTask(with: request, completionHandler: continuation.taskCompletionHandler)
-                
-                if let delegate = delegate {
-                    if let sessionDelegate = session.delegate as? SessionDelegateProxy {
-                        sessionDelegate.addTaskDelegate(task: task, delegate: delegate)
-                    } else {
-                        #if DEBUG
-                        print("Runtime Warning: You provided a delegate to data(for:delegate:), but did not initialize the URLSession with `URLSession.backport(configuration:delegate:delegateQueue:)`, which is necessary to proxy the delegate methods properly.")
-                        #endif
-                    }
-                }
-                
+                addTaskDelegate(task: task, delegate: delegate)
                 task.resume()
             }
         }
@@ -108,17 +112,7 @@ extension URLSession.Backport {
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
                 let task = session.dataTask(with: url, completionHandler: continuation.taskCompletionHandler)
-                
-                if let delegate = delegate {
-                    if let sessionDelegate = session.delegate as? SessionDelegateProxy {
-                        sessionDelegate.addTaskDelegate(task: task, delegate: delegate)
-                    } else {
-                        #if DEBUG
-                        print("Runtime Warning: You provided a delegate to data(from:delegate:), but did not initialize the URLSession with `URLSession.backport(configuration:delegate:delegateQueue:)`, which is necessary to proxy the delegate methods properly.")
-                        #endif
-                    }
-                }
-                
+                addTaskDelegate(task: task, delegate: delegate)
                 task.resume()
             }
         }
@@ -136,17 +130,7 @@ extension URLSession.Backport {
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
                 let task = session.uploadTask(with: request, fromFile: fileURL, completionHandler: continuation.taskCompletionHandler)
-                
-                if let delegate = delegate {
-                    if let sessionDelegate = session.delegate as? SessionDelegateProxy {
-                        sessionDelegate.addTaskDelegate(task: task, delegate: delegate)
-                    } else {
-                        #if DEBUG
-                        print("Runtime Warning: You provided a delegate to upload(for:fromFile:delegate:), but did not initialize the URLSession with `URLSession.backport(configuration:delegate:delegateQueue:)`, which is necessary to proxy the delegate methods properly.")
-                        #endif
-                    }
-                }
-                
+                addTaskDelegate(task: task, delegate: delegate)
                 task.resume()
             }
         }
@@ -164,17 +148,7 @@ extension URLSession.Backport {
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
                 let task = session.uploadTask(with: request, from: bodyData, completionHandler: continuation.taskCompletionHandler)
-                
-                if let delegate = delegate {
-                    if let sessionDelegate = session.delegate as? SessionDelegateProxy {
-                        sessionDelegate.addTaskDelegate(task: task, delegate: delegate)
-                    } else {
-                        #if DEBUG
-                        print("Runtime Warning: You provided a delegate to upload(for:from:delegate:), but did not initialize the URLSession with `URLSession.backport(configuration:delegate:delegateQueue:)`, which is necessary to proxy the delegate methods properly.")
-                        #endif
-                    }
-                }
-                
+                addTaskDelegate(task: task, delegate: delegate)
                 task.resume()
             }
         }
@@ -191,17 +165,7 @@ extension URLSession.Backport {
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
                 let task = session.downloadTask(with: request, completionHandler: continuation.taskCompletionHandler)
-                
-                if let delegate = delegate {
-                    if let sessionDelegate = session.delegate as? SessionDelegateProxy {
-                        sessionDelegate.addTaskDelegate(task: task, delegate: delegate)
-                    } else {
-                        #if DEBUG
-                        print("Runtime Warning: You provided a delegate to download(for:delegate:), but did not initialize the URLSession with `URLSession.backport(configuration:delegate:delegateQueue:)`, which is necessary to proxy the delegate methods properly.")
-                        #endif
-                    }
-                }
-                
+                addTaskDelegate(task: task, delegate: delegate)
                 task.resume()
             }
         }
@@ -218,17 +182,7 @@ extension URLSession.Backport {
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
                 let task = session.downloadTask(with: url, completionHandler: continuation.taskCompletionHandler)
-                
-                if let delegate = delegate {
-                    if let sessionDelegate = session.delegate as? SessionDelegateProxy {
-                        sessionDelegate.addTaskDelegate(task: task, delegate: delegate)
-                    } else {
-                        #if DEBUG
-                        print("Runtime Warning: You provided a delegate to download(from:delegate:), but did not initialize the URLSession with `URLSession.backport(configuration:delegate:delegateQueue:)`, which is necessary to proxy the delegate methods properly.")
-                        #endif
-                    }
-                }
-                
+                addTaskDelegate(task: task, delegate: delegate)
                 task.resume()
             }
         }
@@ -245,17 +199,7 @@ extension URLSession.Backport {
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
                 let task = session.downloadTask(withResumeData: resumeData, completionHandler: continuation.taskCompletionHandler)
-                
-                if let delegate = delegate {
-                    if let sessionDelegate = session.delegate as? SessionDelegateProxy {
-                        sessionDelegate.addTaskDelegate(task: task, delegate: delegate)
-                    } else {
-                        #if DEBUG
-                        print("Runtime Warning: You provided a delegate to download(resumeFrom:delegate:), but did not initialize the URLSession with `URLSession.backport(configuration:delegate:delegateQueue:)`, which is necessary to proxy the delegate methods properly.")
-                        #endif
-                    }
-                }
-                
+                addTaskDelegate(task: task, delegate: delegate)
                 task.resume()
             }
         }
