@@ -10,7 +10,7 @@ final class URLSessionBackportTests: XCTestCase {
         if #available(macOS 12.0, iOS 15.0, watchOS 8.0, *) {
             XCTAssertNil(backportedURLSession.delegate)
         } else {
-            XCTAssertTrue(backportedURLSession.delegate is URLSession.Backport.Delegate)
+            XCTAssertTrue(backportedURLSession.delegate is SessionDelegateProxy)
         }
     }
 }

@@ -46,54 +46,13 @@ extension URLSession {
         if #available(macOS 12.0, iOS 15.0, watchOS 8.0, *) {
             return URLSession(configuration: configuration, delegate: delegate, delegateQueue: queue)
         } else {
-            return URLSession(configuration: configuration, delegate: Backport.Delegate(originalDelegate: delegate), delegateQueue: queue)
+            return URLSession(configuration: configuration, delegate: SessionDelegateProxy(originalDelegate: delegate), delegateQueue: queue)
         }
     }
 }
 
 #if compiler(>=5.5.2)
 extension URLSession.Backport {
-    class Delegate: NSObject {
-        struct TaskDelegate {
-            weak var task: URLSessionTask? {
-                didSet {
-                    if task == nil {
-                        delegate = nil
-                        dataAccumulator = nil
-                    }
-                }
-            }
-            var delegate: URLSessionTaskDelegate?
-            var dataAccumulator: DataAccumulator?
-            
-            var dataDelegate: URLSessionDataDelegate? { delegate as? URLSessionDataDelegate }
-            var downloadDelegate: URLSessionDownloadDelegate? { delegate as? URLSessionDownloadDelegate }
-            var streamDelegate: URLSessionStreamDelegate? { delegate as? URLSessionStreamDelegate }
-            var webSocketDelegate: URLSessionWebSocketDelegate? { delegate as? URLSessionWebSocketDelegate }
-        }
-        
-        var originalDelegate: URLSessionDelegate?
-        var taskMap: [Int : TaskDelegate] = [:]
-        
-        init(originalDelegate: URLSessionDelegate?) {
-            self.originalDelegate = originalDelegate
-        }
-        
-        /// Add a new task delegate to track.
-        /// - Parameters:
-        ///   - task: The task to add.
-        ///   - delegate: The delegate for the task.
-        func addTaskDelegate(task: URLSessionTask, delegate: URLSessionTaskDelegate?, dataAccumulator: DataAccumulator? = nil, onResponse: ((URLSessionDataTask, DataAccumulator, Result<URLResponse, Error>) -> Void)? = nil) {
-            dataAccumulator?.onResponse = onResponse
-            taskMap[task.taskIdentifier] = TaskDelegate(task: task, delegate: delegate, dataAccumulator: dataAccumulator)
-        }
-        
-        /// Remove a task delegate when the task is finished.
-        /// - Parameter task: the task to remove.
-        func removeTaskDelegate(task: URLSessionTask) {
-            taskMap.removeValue(forKey: task.taskIdentifier)
-        }
-    }
     
     /// Backported convenience method to load data using an URLRequest, creates and resumes an URLSessionDataTask internally.
     ///
@@ -117,7 +76,7 @@ extension URLSession.Backport {
                 }
                 
                 if let delegate = delegate {
-                    if let sessionDelegate = session.delegate as? Delegate {
+                    if let sessionDelegate = session.delegate as? SessionDelegateProxy {
                         sessionDelegate.addTaskDelegate(task: task, delegate: delegate)
                     } else {
                         #if DEBUG
@@ -153,7 +112,7 @@ extension URLSession.Backport {
                 }
                 
                 if let delegate = delegate {
-                    if let sessionDelegate = session.delegate as? Delegate {
+                    if let sessionDelegate = session.delegate as? SessionDelegateProxy {
                         sessionDelegate.addTaskDelegate(task: task, delegate: delegate)
                     } else {
                         #if DEBUG
@@ -190,7 +149,7 @@ extension URLSession.Backport {
                 }
                 
                 if let delegate = delegate {
-                    if let sessionDelegate = session.delegate as? Delegate {
+                    if let sessionDelegate = session.delegate as? SessionDelegateProxy {
                         sessionDelegate.addTaskDelegate(task: task, delegate: delegate)
                     } else {
                         #if DEBUG
@@ -227,7 +186,7 @@ extension URLSession.Backport {
                 }
                 
                 if let delegate = delegate {
-                    if let sessionDelegate = session.delegate as? Delegate {
+                    if let sessionDelegate = session.delegate as? SessionDelegateProxy {
                         sessionDelegate.addTaskDelegate(task: task, delegate: delegate)
                     } else {
                         #if DEBUG
@@ -263,7 +222,7 @@ extension URLSession.Backport {
                 }
                 
                 if let delegate = delegate {
-                    if let sessionDelegate = session.delegate as? Delegate {
+                    if let sessionDelegate = session.delegate as? SessionDelegateProxy {
                         sessionDelegate.addTaskDelegate(task: task, delegate: delegate)
                     } else {
                         #if DEBUG
@@ -299,7 +258,7 @@ extension URLSession.Backport {
                 }
                 
                 if let delegate = delegate {
-                    if let sessionDelegate = session.delegate as? Delegate {
+                    if let sessionDelegate = session.delegate as? SessionDelegateProxy {
                         sessionDelegate.addTaskDelegate(task: task, delegate: delegate)
                     } else {
                         #if DEBUG
@@ -335,7 +294,7 @@ extension URLSession.Backport {
                 }
                 
                 if let delegate = delegate {
-                    if let sessionDelegate = session.delegate as? Delegate {
+                    if let sessionDelegate = session.delegate as? SessionDelegateProxy {
                         sessionDelegate.addTaskDelegate(task: task, delegate: delegate)
                     } else {
                         #if DEBUG
@@ -426,7 +385,7 @@ extension URLSession.Backport {
             return try await withUnsafeThrowingContinuation { continuation in
                 let task = session.dataTask(with: request)
                 
-                guard let sessionDelegate = session.delegate as? Delegate else {
+                guard let sessionDelegate = session.delegate as? SessionDelegateProxy else {
                     preconditionFailure("Runtime Failure: You must initialize the URLSession with `URLSession.backport(configuration:delegate:delegateQueue:)`, which is necessary to proxy the delegate methods properly.")
                 }
                 
@@ -459,7 +418,7 @@ extension URLSession.Backport {
             return try await withUnsafeThrowingContinuation { continuation in
                 let task = session.dataTask(with: url)
                 
-                guard let sessionDelegate = session.delegate as? Delegate else {
+                guard let sessionDelegate = session.delegate as? SessionDelegateProxy else {
                     preconditionFailure("Runtime Failure: You must initialize the URLSession with `URLSession.backport(configuration:delegate:delegateQueue:)`, which is necessary to proxy the delegate methods properly.")
                 }
                 
@@ -482,7 +441,7 @@ extension URLSession.Backport {
 
 // MARK: - Delegate Proxies
 
-extension URLSession.Backport.Delegate: URLSessionDelegate {
+extension SessionDelegateProxy: URLSessionDelegate {
     func urlSession(_ session: URLSession, didBecomeInvalidWithError error: Error?) {
         originalDelegate?.urlSession?(session, didBecomeInvalidWithError: error)
     }
@@ -516,7 +475,7 @@ extension URLSession.Backport.Delegate: URLSessionDelegate {
 
 /// Note that some of these delegate proxies may be misshandled. If you encounter bugs with some of the more esoteric task delegates, especially compared with how modern OSs handled tiering for task-based delegates, please file an issue or submit a fix to: https://github.com/mochidev/URLSessionBackport/issues
 /// Some of the methods use a tiered approach, specifically those that require completion handlers, while others call all applicable delegates one after another.
-extension URLSession.Backport.Delegate: URLSessionTaskDelegate {
+extension SessionDelegateProxy: URLSessionTaskDelegate {
     var originalTaskDelegate: URLSessionTaskDelegate? { originalDelegate as? URLSessionTaskDelegate }
     
     func urlSession(_ session: URLSession, task: URLSessionTask, willBeginDelayedRequest request: URLRequest, completionHandler: @escaping (URLSession.DelayedRequestDisposition, URLRequest?) -> Void) {
@@ -593,7 +552,7 @@ extension URLSession.Backport.Delegate: URLSessionTaskDelegate {
     }
 }
 
-extension URLSession.Backport.Delegate: URLSessionDataDelegate {
+extension SessionDelegateProxy: URLSessionDataDelegate {
     var originalDataDelegate: URLSessionDataDelegate? { originalDelegate as? URLSessionDataDelegate }
     
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
@@ -647,7 +606,7 @@ extension URLSession.Backport.Delegate: URLSessionDataDelegate {
     }
 }
 
-extension URLSession.Backport.Delegate: URLSessionDownloadDelegate {
+extension SessionDelegateProxy: URLSessionDownloadDelegate {
     var originalDownloadDelegate: URLSessionDownloadDelegate? { originalDelegate as? URLSessionDownloadDelegate }
     
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
@@ -673,7 +632,7 @@ extension URLSession.Backport.Delegate: URLSessionDownloadDelegate {
     }
 }
 
-extension URLSession.Backport.Delegate: URLSessionStreamDelegate {
+extension SessionDelegateProxy: URLSessionStreamDelegate {
     var originalStreamDelegate: URLSessionStreamDelegate? { originalDelegate as? URLSessionStreamDelegate }
     
     func urlSession(_ session: URLSession, readClosedFor streamTask: URLSessionStreamTask) {
@@ -697,7 +656,7 @@ extension URLSession.Backport.Delegate: URLSessionStreamDelegate {
     }
 }
 
-extension URLSession.Backport.Delegate: URLSessionWebSocketDelegate {
+extension SessionDelegateProxy: URLSessionWebSocketDelegate {
     var originalWebSocketDelegate: URLSessionWebSocketDelegate? { originalDelegate as? URLSessionWebSocketDelegate }
     
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol protocol: String?) {
