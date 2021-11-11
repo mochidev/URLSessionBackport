@@ -51,6 +51,8 @@ extension URLSession {
     }
 }
 
+// MARK: - Backported Asyncronous Methods
+
 #if compiler(>=5.5.2)
 extension URLSession.Backport {
     
@@ -492,6 +494,7 @@ extension SessionDelegateProxy: URLSessionDataDelegate {
     var originalDataDelegate: URLSessionDataDelegate? { originalDelegate as? URLSessionDataDelegate }
     
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        // Note from AsyncBytes documentation: "Delegate will not be called for response and data delivery."
         let taskDelegate = taskMap[dataTask.taskIdentifier]
         
         func verifyDisposition(_ disposition: URLSession.ResponseDisposition) {
@@ -525,6 +528,7 @@ extension SessionDelegateProxy: URLSessionDataDelegate {
     }
     
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        // Note from AsyncBytes documentation: "Delegate will not be called for response and data delivery."
         let taskDelegate = taskMap[dataTask.taskIdentifier]
         taskDelegate?.dataAccumulator?.addBuffer(data)
         taskDelegate?.dataDelegate?.urlSession?(session, dataTask: dataTask, didReceive: data)

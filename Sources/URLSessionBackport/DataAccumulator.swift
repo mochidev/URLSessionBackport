@@ -10,7 +10,7 @@ import Foundation
 
 #if compiler(>=5.5.2)
 @usableFromInline
-class DataAccumulator {
+class DataAccumulator: BytesProvider {
     var currentOffset: Int = 0
     var remainingDataBuffers: [Data] = []
     var result: Result<Void, Error>? = nil {
@@ -52,7 +52,7 @@ class DataAccumulator {
     }
     
     @usableFromInline
-    func consume() async throws -> UInt8? {
+    func next() async throws -> UInt8? {
         if let first = remainingDataBuffers.first { // pull the next byte off the stack
             let byte = first[currentOffset]
             currentOffset += 1
