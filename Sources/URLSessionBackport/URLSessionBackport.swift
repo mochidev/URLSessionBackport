@@ -93,12 +93,17 @@ extension URLSession.Backport {
 extension URLSession.Backport {
     /// Errors that can be thrown which are unique to the backporting effort
     public enum Error: Swift.Error, LocalizedError {
+        /// The completion handler was called with an unexpected combination of parameters (ie. data, but no response, or error and response…)
         case unexpectedTaskCompletionHandler(Bool, Bool, Bool)
+        /// A call to `bytes()` was made, but the URLSession's delegate was not properly configured.
+        case missingBackportSessionDelegateProxy
         
         public var errorDescription: String? {
             switch self {
             case .unexpectedTaskCompletionHandler(let a, let b, let c):
                 return "The task completion handler was called with an unexpected arrangement of values: (\(a ? ".some" : ".none"), \(b ? ".some" : ".none"), \(c ? ".some" : ".none"))."
+            case .missingBackportSessionDelegateProxy:
+                return "You must initialize the URLSession with `URLSession.backport(configuration:delegate:delegateQueue:)`, which is necessary to properly proxy the delegate methods used for asyncronous bytes access."
             }
         }
     }
@@ -227,7 +232,8 @@ extension URLSession.Backport {
                 let task = session.dataTask(with: request)
                 
                 guard let sessionDelegate = session.delegate as? SessionDelegateProxy else {
-                    preconditionFailure("Runtime Failure: You must initialize the URLSession with `URLSession.backport(configuration:delegate:delegateQueue:)`, which is necessary to proxy the delegate methods properly.")
+                    continuation.resume(throwing: Error.missingBackportSessionDelegateProxy)
+                    return
                 }
                 
                 let accumulator = DataAccumulator()
@@ -260,7 +266,8 @@ extension URLSession.Backport {
                 let task = session.dataTask(with: url)
                 
                 guard let sessionDelegate = session.delegate as? SessionDelegateProxy else {
-                    preconditionFailure("Runtime Failure: You must initialize the URLSession with `URLSession.backport(configuration:delegate:delegateQueue:)`, which is necessary to proxy the delegate methods properly.")
+                    continuation.resume(throwing: Error.missingBackportSessionDelegateProxy)
+                    return
                 }
                 
                 let accumulator = DataAccumulator()
