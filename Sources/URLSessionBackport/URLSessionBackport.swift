@@ -62,8 +62,9 @@ extension UnsafeContinuation {
             resume(returning: (a, b))
         case (.none, .none, .some(let error)):
             resume(throwing: error)
-        default:
-            preconditionFailure("The task returned incompatible data")
+        case (let a, let b, let c):
+            // Note: Not sure how to avoid this force cast, but tests don't seem to mind it.
+            resume(throwing: URLSession.Backport.Error.unexpectedTaskCompletionHandler(a != nil, b != nil, c != nil) as! E)
         }
     }
 }
@@ -86,6 +87,20 @@ extension URLSession.Backport {
         }
         
         task.resume()
+    }
+}
+
+extension URLSession.Backport {
+    /// Errors that can be thrown which are unique to the backporting effort
+    public enum Error: Swift.Error, LocalizedError {
+        case unexpectedTaskCompletionHandler(Bool, Bool, Bool)
+        
+        public var errorDescription: String? {
+            switch self {
+            case .unexpectedTaskCompletionHandler(let a, let b, let c):
+                return "The task completion handler was called with an unexpected arrangement of values: (\(a ? ".some" : ".none"), \(b ? ".some" : ".none"), \(c ? ".some" : ".none"))."
+            }
+        }
     }
 }
 
