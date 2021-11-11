@@ -54,6 +54,20 @@ extension URLSession {
 // MARK: - Backported Asyncronous Methods
 
 #if compiler(>=5.5.2)
+extension UnsafeContinuation {
+    /// A generic completion handler for URLSession-based tasks
+    func taskCompletionHandler<A, B>(_ a: A?, _ b: B?, _ error: E?) where T == (A, B) {
+        switch (a, b, error) {
+        case (.some(let a), .some(let b), .none):
+            resume(returning: (a, b))
+        case (.none, .none, .some(let error)):
+            resume(throwing: error)
+        default:
+            preconditionFailure("The task returned incompatible data")
+        }
+    }
+}
+
 extension URLSession.Backport {
     
     /// Backported convenience method to load data using an URLRequest, creates and resumes an URLSessionDataTask internally.
@@ -66,16 +80,7 @@ extension URLSession.Backport {
             return try await session.data(for: request, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
-                let task = session.dataTask(with: request) { data, response, error in
-                    switch (data, response, error) {
-                    case (.some(let data), .some(let response), .none):
-                        continuation.resume(returning: (data, response))
-                    case (.none, .none, .some(let error)):
-                        continuation.resume(throwing: error)
-                    default:
-                        preconditionFailure("The data task returned incompatible data")
-                    }
-                }
+                let task = session.dataTask(with: request, completionHandler: continuation.taskCompletionHandler)
                 
                 if let delegate = delegate {
                     if let sessionDelegate = session.delegate as? SessionDelegateProxy {
@@ -102,16 +107,7 @@ extension URLSession.Backport {
             return try await session.data(from: url, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
-                let task = session.dataTask(with: url) { data, response, error in
-                    switch (data, response, error) {
-                    case (.some(let data), .some(let response), .none):
-                        continuation.resume(returning: (data, response))
-                    case (.none, .none, .some(let error)):
-                        continuation.resume(throwing: error)
-                    default:
-                        preconditionFailure("The data task returned incompatible data")
-                    }
-                }
+                let task = session.dataTask(with: url, completionHandler: continuation.taskCompletionHandler)
                 
                 if let delegate = delegate {
                     if let sessionDelegate = session.delegate as? SessionDelegateProxy {
@@ -139,16 +135,7 @@ extension URLSession.Backport {
             return try await session.upload(for: request, fromFile: fileURL, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
-                let task = session.uploadTask(with: request, fromFile: fileURL) { data, response, error in
-                    switch (data, response, error) {
-                    case (.some(let data), .some(let response), .none):
-                        continuation.resume(returning: (data, response))
-                    case (.none, .none, .some(let error)):
-                        continuation.resume(throwing: error)
-                    default:
-                        preconditionFailure("The upload task returned incompatible data")
-                    }
-                }
+                let task = session.uploadTask(with: request, fromFile: fileURL, completionHandler: continuation.taskCompletionHandler)
                 
                 if let delegate = delegate {
                     if let sessionDelegate = session.delegate as? SessionDelegateProxy {
@@ -176,16 +163,7 @@ extension URLSession.Backport {
             return try await session.upload(for: request, from: bodyData, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
-                let task = session.uploadTask(with: request, from: bodyData) { data, response, error in
-                    switch (data, response, error) {
-                    case (.some(let data), .some(let response), .none):
-                        continuation.resume(returning: (data, response))
-                    case (.none, .none, .some(let error)):
-                        continuation.resume(throwing: error)
-                    default:
-                        preconditionFailure("The upload task returned incompatible data")
-                    }
-                }
+                let task = session.uploadTask(with: request, from: bodyData, completionHandler: continuation.taskCompletionHandler)
                 
                 if let delegate = delegate {
                     if let sessionDelegate = session.delegate as? SessionDelegateProxy {
@@ -212,16 +190,7 @@ extension URLSession.Backport {
             return try await session.download(for: request, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
-                let task = session.downloadTask(with: request) { url, response, error in
-                    switch (url, response, error) {
-                    case (.some(let url), .some(let response), .none):
-                        continuation.resume(returning: (url, response))
-                    case (.none, .none, .some(let error)):
-                        continuation.resume(throwing: error)
-                    default:
-                        preconditionFailure("The download task returned incompatible data")
-                    }
-                }
+                let task = session.downloadTask(with: request, completionHandler: continuation.taskCompletionHandler)
                 
                 if let delegate = delegate {
                     if let sessionDelegate = session.delegate as? SessionDelegateProxy {
@@ -248,16 +217,7 @@ extension URLSession.Backport {
             return try await session.download(from: url, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
-                let task = session.downloadTask(with: url) { url, response, error in
-                    switch (url, response, error) {
-                    case (.some(let url), .some(let response), .none):
-                        continuation.resume(returning: (url, response))
-                    case (.none, .none, .some(let error)):
-                        continuation.resume(throwing: error)
-                    default:
-                        preconditionFailure("The download task returned incompatible data")
-                    }
-                }
+                let task = session.downloadTask(with: url, completionHandler: continuation.taskCompletionHandler)
                 
                 if let delegate = delegate {
                     if let sessionDelegate = session.delegate as? SessionDelegateProxy {
@@ -284,16 +244,7 @@ extension URLSession.Backport {
             return try await session.download(resumeFrom: resumeData, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
-                let task = session.downloadTask(withResumeData: resumeData) { url, response, error in
-                    switch (url, response, error) {
-                    case (.some(let url), .some(let response), .none):
-                        continuation.resume(returning: (url, response))
-                    case (.none, .none, .some(let error)):
-                        continuation.resume(throwing: error)
-                    default:
-                        preconditionFailure("The download task returned incompatible data")
-                    }
-                }
+                let task = session.downloadTask(withResumeData: resumeData, completionHandler: continuation.taskCompletionHandler)
                 
                 if let delegate = delegate {
                     if let sessionDelegate = session.delegate as? SessionDelegateProxy {
