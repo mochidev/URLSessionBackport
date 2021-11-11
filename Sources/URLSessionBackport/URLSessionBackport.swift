@@ -52,6 +52,64 @@ extension URLSession {
 }
 
 #if compiler(>=5.5.2)
+@usableFromInline
+class DataAccumulator {
+    var currentOffset: Int = 0
+    var remainingDataBuffers: [Data] = []
+    var result: Result<Void, Error>? = nil {
+        didSet {
+            if let continuation = continuation {
+                switch result {
+                case .none:                 return
+                case .success:              continuation.resume(returning: nil)
+                case .failure(let error):   continuation.resume(throwing: error)
+                }
+            }
+            continuation = nil
+        }
+    }
+    var continuation: CheckedContinuation<UInt8?, Error>?
+    var onResponse: ((URLSessionDataTask, DataAccumulator, Result<URLResponse, Error>) -> Void)?
+    
+    init() {}
+    
+    func addBuffer(_ data: Data) {
+        guard !data.isEmpty else { return }
+        remainingDataBuffers.append(data)
+        
+        if let continuation = continuation {
+            let first = remainingDataBuffers.first!
+            let nextByte = first[currentOffset]
+            currentOffset += 1
+            if currentOffset >= first.count {
+                currentOffset = 0
+                remainingDataBuffers.removeFirst()
+            }
+            continuation.resume(returning: nextByte)
+        }
+        continuation = nil
+    }
+    
+    @usableFromInline
+    func consume() async throws -> UInt8? {
+        if let first = remainingDataBuffers.first { // pull the next byte off the stack
+            let byte = first[currentOffset]
+            currentOffset += 1
+            if currentOffset >= first.count {
+                currentOffset = 0
+                remainingDataBuffers.removeFirst()
+            }
+            return byte
+        } else if try result?.get() == nil { // waiting for more data
+            return try await withCheckedThrowingContinuation { continuation in
+                self.continuation = continuation
+            }
+        } else { // finished
+            return nil
+        }
+    }
+}
+
 extension URLSession.Backport {
     class Delegate: NSObject {
         struct TaskDelegate {
@@ -59,10 +117,12 @@ extension URLSession.Backport {
                 didSet {
                     if task == nil {
                         delegate = nil
+                        dataAccumulator = nil
                     }
                 }
             }
             var delegate: URLSessionTaskDelegate?
+            var dataAccumulator: DataAccumulator?
             
             var dataDelegate: URLSessionDataDelegate? { delegate as? URLSessionDataDelegate }
             var downloadDelegate: URLSessionDownloadDelegate? { delegate as? URLSessionDownloadDelegate }
@@ -81,8 +141,9 @@ extension URLSession.Backport {
         /// - Parameters:
         ///   - task: The task to add.
         ///   - delegate: The delegate for the task.
-        func addTaskDelegate(task: URLSessionTask, delegate: URLSessionTaskDelegate?) {
-            taskMap[task.taskIdentifier] = TaskDelegate(task: task, delegate: delegate)
+        func addTaskDelegate(task: URLSessionTask, delegate: URLSessionTaskDelegate?, dataAccumulator: DataAccumulator? = nil, onResponse: ((URLSessionDataTask, DataAccumulator, Result<URLResponse, Error>) -> Void)? = nil) {
+            dataAccumulator?.onResponse = onResponse
+            taskMap[task.taskIdentifier] = TaskDelegate(task: task, delegate: delegate, dataAccumulator: dataAccumulator)
         }
         
         /// Remove a task delegate when the task is finished.
@@ -127,7 +188,7 @@ extension URLSession.Backport {
             }
         }
     }
-
+    
     /// Backported convenience method to load data using an URL, creates and resumes an URLSessionDataTask internally.
     ///
     /// - Parameter url: The URL for which to load data.
@@ -163,7 +224,7 @@ extension URLSession.Backport {
             }
         }
     }
-
+    
     /// Backported convenience method to upload data using an URLRequest, creates and resumes an URLSessionUploadTask internally.
     ///
     /// - Parameter request: The URLRequest for which to upload data.
@@ -200,7 +261,7 @@ extension URLSession.Backport {
             }
         }
     }
-
+    
     /// Backported convenience method to upload data using an URLRequest, creates and resumes an URLSessionUploadTask internally.
     ///
     /// - Parameter request: The URLRequest for which to upload data.
@@ -237,7 +298,7 @@ extension URLSession.Backport {
             }
         }
     }
-
+    
     /// Backported convenience method to download using an URLRequest, creates and resumes an URLSessionDownloadTask internally.
     ///
     /// - Parameter request: The URLRequest for which to download.
@@ -248,10 +309,10 @@ extension URLSession.Backport {
             return try await session.download(for: request, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
-                let task = session.downloadTask(with: request) { data, response, error in
-                    switch (data, response, error) {
-                    case (.some(let data), .some(let response), .none):
-                        continuation.resume(returning: (data, response))
+                let task = session.downloadTask(with: request) { url, response, error in
+                    switch (url, response, error) {
+                    case (.some(let url), .some(let response), .none):
+                        continuation.resume(returning: (url, response))
                     case (.none, .none, .some(let error)):
                         continuation.resume(throwing: error)
                     default:
@@ -273,7 +334,7 @@ extension URLSession.Backport {
             }
         }
     }
-
+    
     /// Backported convenience method to download using an URL, creates and resumes an URLSessionDownloadTask internally.
     ///
     /// - Parameter url: The URL for which to download.
@@ -284,10 +345,10 @@ extension URLSession.Backport {
             return try await session.download(from: url, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
-                let task = session.downloadTask(with: url) { data, response, error in
-                    switch (data, response, error) {
-                    case (.some(let data), .some(let response), .none):
-                        continuation.resume(returning: (data, response))
+                let task = session.downloadTask(with: url) { url, response, error in
+                    switch (url, response, error) {
+                    case (.some(let url), .some(let response), .none):
+                        continuation.resume(returning: (url, response))
                     case (.none, .none, .some(let error)):
                         continuation.resume(throwing: error)
                     default:
@@ -309,7 +370,7 @@ extension URLSession.Backport {
             }
         }
     }
-
+    
     /// Backported convenience method to resume download, creates and resumes an URLSessionDownloadTask internally.
     ///
     /// - Parameter resumeData: Resume data from an incomplete download.
@@ -320,10 +381,10 @@ extension URLSession.Backport {
             return try await session.download(resumeFrom: resumeData, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
-                let task = session.downloadTask(withResumeData: resumeData) { data, response, error in
-                    switch (data, response, error) {
-                    case (.some(let data), .some(let response), .none):
-                        continuation.resume(returning: (data, response))
+                let task = session.downloadTask(withResumeData: resumeData) { url, response, error in
+                    switch (url, response, error) {
+                    case (.some(let url), .some(let response), .none):
+                        continuation.resume(returning: (url, response))
                     case (.none, .none, .some(let error)):
                         continuation.resume(throwing: error)
                     default:
@@ -345,26 +406,134 @@ extension URLSession.Backport {
             }
         }
     }
-
+    
     /// AsyncBytes conforms to AsyncSequence for data delivery. The sequence is single pass. Delegate will not be called for response and data delivery.
     public struct AsyncBytes : AsyncSequence {
-        
-        /// Underlying data task providing the bytes.
-        internal(set) public var task: URLSessionDataTask
         
         public typealias Element = UInt8
         public typealias AsyncIterator = Iterator
         
-        @frozen public struct Iterator : AsyncIteratorProtocol {
+        @usableFromInline
+        enum Storage {
+            case standard(Any)
+            case dataAccumulator(DataAccumulator)
+        }
+        
+        /// Underlying data task providing the bytes.
+        internal(set) public var task: URLSessionDataTask
+        
+        var storage: Storage
+        
+        init(task: URLSessionDataTask, dataAccumulator: DataAccumulator) {
+            self.task = task
+            self.storage = .dataAccumulator(dataAccumulator)
+        }
+        
+        @available(macOS 12.0, iOS 15.0, watchOS 8.0, *)
+        init(_ asyncBytes: URLSession.AsyncBytes) {
+            self.task = asyncBytes.task
+            self.storage = .standard(asyncBytes)
+        }
+        
+        public struct Iterator : AsyncIteratorProtocol {
             public typealias Element = UInt8
             
+            @usableFromInline
+            var storage: Storage
+            
+            init(_ storage: Storage) {
+                self.storage = storage
+            }
+            
             @inlinable public mutating func next() async throws -> UInt8? {
-                return nil
+                switch storage {
+                case .standard(let any):
+                    guard #available(macOS 12.0, iOS 15.0, watchOS 8.0, *) else { preconditionFailure("Standard mistakenly set on older OS!") }
+                    var iterator = any as! URLSession.AsyncBytes.Iterator
+                    let value = try await iterator.next()
+                    storage = .standard(iterator) // save the modified iterator
+                    return value
+                case .dataAccumulator(let dataAccumulator):
+                    return try await dataAccumulator.consume()
+                }
             }
         }
         
         public func makeAsyncIterator() -> Iterator {
-            Iterator()
+            switch storage {
+            case .standard(let any):
+                guard #available(macOS 12.0, iOS 15.0, watchOS 8.0, *) else { preconditionFailure("Standard mistakenly set on older OS!") }
+                let sequence = any as! URLSession.AsyncBytes
+                return Iterator(.standard(sequence.makeAsyncIterator()))
+            case .dataAccumulator(let dataAccumulator):
+                return Iterator(.dataAccumulator(dataAccumulator))
+            }
+        }
+    }
+    
+    /// Returns a byte stream that conforms to AsyncSequence protocol.
+    ///
+    /// - Parameter url: The URL for which to load data.
+    /// - Parameter delegate: Task-specific delegate.
+    /// - Returns: Data stream and response.
+    public func bytes(for request: URLRequest, delegate: URLSessionTaskDelegate? = nil) async throws -> (AsyncBytes, URLResponse) {
+        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, *) {
+            let results = try await session.bytes(for: request, delegate: delegate)
+            return (AsyncBytes(results.0), results.1)
+        } else {
+            return try await withUnsafeThrowingContinuation { continuation in
+                let task = session.dataTask(with: request)
+                
+                guard let sessionDelegate = session.delegate as? Delegate else {
+                    preconditionFailure("Runtime Failure: You must initialize the URLSession with `URLSession.backport(configuration:delegate:delegateQueue:)`, which is necessary to proxy the delegate methods properly.")
+                }
+                
+                let accumulator = DataAccumulator()
+                
+                sessionDelegate.addTaskDelegate(task: task, delegate: delegate, dataAccumulator: accumulator) { task, accumulator, results in
+                    switch results {
+                    case .success(let response):
+                        continuation.resume(returning: (AsyncBytes(task: task, dataAccumulator: accumulator), response))
+                    case .failure(let error):
+                        continuation.resume(throwing: error)
+                    }
+                }
+                
+                task.resume()
+            }
+        }
+    }
+    
+    /// Returns a byte stream that conforms to AsyncSequence protocol.
+    ///
+    /// - Parameter request: The URLRequest for which to load data.
+    /// - Parameter delegate: Task-specific delegate.
+    /// - Returns: Data stream and response.
+    public func bytes(from url: URL, delegate: URLSessionTaskDelegate? = nil) async throws -> (AsyncBytes, URLResponse) {
+        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, *) {
+            let results = try await session.bytes(from: url, delegate: delegate)
+            return (AsyncBytes(results.0), results.1)
+        } else {
+            return try await withUnsafeThrowingContinuation { continuation in
+                let task = session.dataTask(with: url)
+                
+                guard let sessionDelegate = session.delegate as? Delegate else {
+                    preconditionFailure("Runtime Failure: You must initialize the URLSession with `URLSession.backport(configuration:delegate:delegateQueue:)`, which is necessary to proxy the delegate methods properly.")
+                }
+                
+                let accumulator = DataAccumulator()
+                
+                sessionDelegate.addTaskDelegate(task: task, delegate: delegate, dataAccumulator: accumulator) { task, accumulator, results in
+                    switch results {
+                    case .success(let response):
+                        continuation.resume(returning: (AsyncBytes(task: task, dataAccumulator: accumulator), response))
+                    case .failure(let error):
+                        continuation.resume(throwing: error)
+                    }
+                }
+                
+                task.resume()
+            }
         }
     }
 }
@@ -462,7 +631,19 @@ extension URLSession.Backport.Delegate: URLSessionTaskDelegate {
     // func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics)
     
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        taskMap[task.taskIdentifier]?.delegate?.urlSession?(session, task: task, didCompleteWithError: error)
+        let taskDelegate = taskMap[task.taskIdentifier]
+        if let accumulator = taskDelegate?.dataAccumulator {
+            if let error = error {
+                accumulator.onResponse?(task as! URLSessionDataTask, accumulator, .failure(error))
+                taskDelegate?.dataAccumulator?.result = .failure(error)
+            } else {
+                taskDelegate?.dataAccumulator?.result = .success(())
+            }
+            
+            accumulator.onResponse = nil
+        }
+        
+        taskDelegate?.delegate?.urlSession?(session, task: task, didCompleteWithError: error)
         originalTaskDelegate?.urlSession?(session, task: task, didCompleteWithError: error)
         
         removeTaskDelegate(task: task)
@@ -473,12 +654,23 @@ extension URLSession.Backport.Delegate: URLSessionDataDelegate {
     var originalDataDelegate: URLSessionDataDelegate? { originalDelegate as? URLSessionDataDelegate }
     
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
-        if let taskDelegateMethod = taskMap[dataTask.taskIdentifier]?.dataDelegate?.urlSession(_:dataTask:didReceive:completionHandler:) {
-            taskDelegateMethod(session, dataTask, response, completionHandler)
+        let taskDelegate = taskMap[dataTask.taskIdentifier]
+        
+        func intermediateHandler(_ disposition: URLSession.ResponseDisposition) {
+            // If we have an accumulator, we are interested in the results!
+            if case .allow = disposition, let accumulator = taskDelegate?.dataAccumulator {
+                accumulator.onResponse?(dataTask, accumulator, .success(response))
+                accumulator.onResponse = nil
+            }
+            completionHandler(disposition)
+        }
+        
+        if let taskDelegateMethod = taskDelegate?.dataDelegate?.urlSession(_:dataTask:didReceive:completionHandler:) {
+            taskDelegateMethod(session, dataTask, response, intermediateHandler)
         } else if let delegateMethod = originalDataDelegate?.urlSession(_:dataTask:didReceive:completionHandler:) {
-            delegateMethod(session, dataTask, response, completionHandler)
+            delegateMethod(session, dataTask, response, intermediateHandler)
         } else {
-            completionHandler(.allow)
+            intermediateHandler(.allow)
         }
     }
     
@@ -493,7 +685,9 @@ extension URLSession.Backport.Delegate: URLSessionDataDelegate {
     }
     
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        taskMap[dataTask.taskIdentifier]?.dataDelegate?.urlSession?(session, dataTask: dataTask, didReceive: data)
+        let taskDelegate = taskMap[dataTask.taskIdentifier]
+        taskDelegate?.dataAccumulator?.addBuffer(data)
+        taskDelegate?.dataDelegate?.urlSession?(session, dataTask: dataTask, didReceive: data)
         originalDataDelegate?.urlSession?(session, dataTask: dataTask, didReceive: data)
     }
     
