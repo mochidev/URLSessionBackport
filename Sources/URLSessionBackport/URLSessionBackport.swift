@@ -68,7 +68,11 @@ class DataAccumulator {
             continuation = nil
         }
     }
+    
+    /// The continuation to resume if anything is waiting on the accumulator for more data. This is set only when the accumulator had no more data when more was requested.
     var continuation: CheckedContinuation<UInt8?, Error>?
+    
+    /// The closure to call when the first response, or error, is encountered.
     var onResponse: ((URLSessionDataTask, DataAccumulator, Result<URLResponse, Error>) -> Void)?
     
     init() {}
@@ -627,13 +631,14 @@ extension URLSession.Backport.Delegate: URLSessionTaskDelegate {
         originalTaskDelegate?.urlSession?(session, task: task, didSendBodyData: bytesSent, totalBytesSent: totalBytesSent, totalBytesExpectedToSend: totalBytesExpectedToSend)
     }
     
-    // This is not implemnted, since it was introduced along with macOS 12/iOS 15, and the proxy won't be used on that OS version anyways.
+    // This is not implemented, since it was introduced along with macOS 12/iOS 15, and the proxy won't be used on that OS version anyways.
     // func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics)
     
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         let taskDelegate = taskMap[task.taskIdentifier]
         if let accumulator = taskDelegate?.dataAccumulator {
             if let error = error {
+                // An accumulator will only be set for data tasks, so we can assume this is the case if one is available.
                 accumulator.onResponse?(task as! URLSessionDataTask, accumulator, .failure(error))
                 taskDelegate?.dataAccumulator?.result = .failure(error)
             } else {
@@ -656,8 +661,8 @@ extension URLSession.Backport.Delegate: URLSessionDataDelegate {
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
         let taskDelegate = taskMap[dataTask.taskIdentifier]
         
-        func intermediateHandler(_ disposition: URLSession.ResponseDisposition) {
-            // If we have an accumulator, we are interested in the results!
+        func verifyDisposition(_ disposition: URLSession.ResponseDisposition) {
+            // If we have an accumulator, we are interested in the results of the disposition!
             if case .allow = disposition, let accumulator = taskDelegate?.dataAccumulator {
                 accumulator.onResponse?(dataTask, accumulator, .success(response))
                 accumulator.onResponse = nil
@@ -666,22 +671,24 @@ extension URLSession.Backport.Delegate: URLSessionDataDelegate {
         }
         
         if let taskDelegateMethod = taskDelegate?.dataDelegate?.urlSession(_:dataTask:didReceive:completionHandler:) {
-            taskDelegateMethod(session, dataTask, response, intermediateHandler)
+            taskDelegateMethod(session, dataTask, response, verifyDisposition)
         } else if let delegateMethod = originalDataDelegate?.urlSession(_:dataTask:didReceive:completionHandler:) {
-            delegateMethod(session, dataTask, response, intermediateHandler)
+            delegateMethod(session, dataTask, response, verifyDisposition)
         } else {
-            intermediateHandler(.allow)
+            verifyDisposition(.allow)
         }
     }
     
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didBecome downloadTask: URLSessionDownloadTask) {
         taskMap[dataTask.taskIdentifier]?.dataDelegate?.urlSession?(session, dataTask: dataTask, didBecome: downloadTask)
         originalDataDelegate?.urlSession?(session, dataTask: dataTask, didBecome: downloadTask)
+        // Note: The continuation in an accumulator may leak at this point, and should be verified.
     }
     
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didBecome streamTask: URLSessionStreamTask) {
         taskMap[dataTask.taskIdentifier]?.dataDelegate?.urlSession?(session, dataTask: dataTask, didBecome: streamTask)
         originalDataDelegate?.urlSession?(session, dataTask: dataTask, didBecome: streamTask)
+        // Note: The continuation in an accumulator may leak at this point, and should be verified.
     }
     
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
@@ -707,8 +714,14 @@ extension URLSession.Backport.Delegate: URLSessionDownloadDelegate {
     
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         // Note that these methods are considered to be mandatory, which might cause issues?
-        taskMap[downloadTask.taskIdentifier]?.downloadDelegate?.urlSession(session, downloadTask: downloadTask, didFinishDownloadingTo: location)
-        originalDownloadDelegate?.urlSession(session, downloadTask: downloadTask, didFinishDownloadingTo: location)
+        if let taskDownloadDelegate = taskMap[downloadTask.taskIdentifier]?.downloadDelegate,
+           taskDownloadDelegate.responds(to: #selector(urlSession(_:downloadTask:didFinishDownloadingTo:))) {
+            taskMap[downloadTask.taskIdentifier]?.downloadDelegate?.urlSession(session, downloadTask: downloadTask, didFinishDownloadingTo: location)
+        }
+        if let originalDownloadDelegate = originalDownloadDelegate,
+           originalDownloadDelegate.responds(to: #selector(urlSession(_:downloadTask:didFinishDownloadingTo:))) {
+            originalDownloadDelegate.urlSession(session, downloadTask: downloadTask, didFinishDownloadingTo: location)
+        }
     }
     
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
