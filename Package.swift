@@ -7,6 +7,7 @@ let package = Package(
     name: "URLSessionBackport",
     platforms: [
         .macOS(.v10_15),
+        .tvOS(.v13),
         .iOS(.v13),
         .watchOS(.v6),
     ],

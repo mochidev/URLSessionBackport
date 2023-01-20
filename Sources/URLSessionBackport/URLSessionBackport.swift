@@ -117,7 +117,7 @@ extension URLSession.Backport {
     /// - Parameter delegate: Task-specific delegate.
     /// - Returns: Data and response.
     public func data(for request: URLRequest, delegate: URLSessionTaskDelegate? = nil) async throws -> (Data, URLResponse) {
-        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, *) {
+        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
             return try await session.data(for: request, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
@@ -132,7 +132,7 @@ extension URLSession.Backport {
     /// - Parameter delegate: Task-specific delegate.
     /// - Returns: Data and response.
     public func data(from url: URL, delegate: URLSessionTaskDelegate? = nil) async throws -> (Data, URLResponse) {
-        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, *) {
+        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
             return try await session.data(from: url, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
@@ -148,7 +148,7 @@ extension URLSession.Backport {
     /// - Parameter delegate: Task-specific delegate.
     /// - Returns: Data and response.
     public func upload(for request: URLRequest, fromFile fileURL: URL, delegate: URLSessionTaskDelegate? = nil) async throws -> (Data, URLResponse) {
-        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, *) {
+        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
             return try await session.upload(for: request, fromFile: fileURL, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
@@ -164,7 +164,7 @@ extension URLSession.Backport {
     /// - Parameter delegate: Task-specific delegate.
     /// - Returns: Data and response.
     public func upload(for request: URLRequest, from bodyData: Data, delegate: URLSessionTaskDelegate? = nil) async throws -> (Data, URLResponse) {
-        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, *) {
+        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
             return try await session.upload(for: request, from: bodyData, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
@@ -179,7 +179,7 @@ extension URLSession.Backport {
     /// - Parameter delegate: Task-specific delegate.
     /// - Returns: Downloaded file URL and response. The file will not be removed automatically.
     public func download(for request: URLRequest, delegate: URLSessionTaskDelegate? = nil) async throws -> (URL, URLResponse) {
-        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, *) {
+        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
             return try await session.download(for: request, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
@@ -194,7 +194,7 @@ extension URLSession.Backport {
     /// - Parameter delegate: Task-specific delegate.
     /// - Returns: Downloaded file URL and response. The file will not be removed automatically.
     public func download(from url: URL, delegate: URLSessionTaskDelegate? = nil) async throws -> (URL, URLResponse) {
-        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, *) {
+        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
             return try await session.download(from: url, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
@@ -209,7 +209,7 @@ extension URLSession.Backport {
     /// - Parameter delegate: Task-specific delegate.
     /// - Returns: Downloaded file URL and response. The file will not be removed automatically.
     public func download(resumeFrom resumeData: Data, delegate: URLSessionTaskDelegate? = nil) async throws -> (URL, URLResponse) {
-        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, *) {
+        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
             return try await session.download(resumeFrom: resumeData, delegate: delegate)
         } else {
             return try await withUnsafeThrowingContinuation { continuation in
@@ -224,7 +224,7 @@ extension URLSession.Backport {
     /// - Parameter delegate: Task-specific delegate.
     /// - Returns: Data stream and response.
     public func bytes(for request: URLRequest, delegate: URLSessionTaskDelegate? = nil) async throws -> (AsyncBytes, URLResponse) {
-        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, *) {
+        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
             let results = try await session.bytes(for: request, delegate: delegate)
             return (AsyncBytes(results.0), results.1)
         } else {
@@ -258,7 +258,7 @@ extension URLSession.Backport {
     /// - Parameter delegate: Task-specific delegate.
     /// - Returns: Data stream and response.
     public func bytes(from url: URL, delegate: URLSessionTaskDelegate? = nil) async throws -> (AsyncBytes, URLResponse) {
-        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, *) {
+        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
             let results = try await session.bytes(from: url, delegate: delegate)
             return (AsyncBytes(results.0), results.1)
         } else {

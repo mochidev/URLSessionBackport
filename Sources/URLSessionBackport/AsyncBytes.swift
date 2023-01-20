@@ -15,7 +15,7 @@ protocol BytesProvider {
     mutating func next() async throws -> UInt8?
 }
 
-@available(macOS 12.0, iOS 15.0, watchOS 8.0, *)
+@available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
 extension URLSession.AsyncBytes.Iterator: BytesProvider {}
 
 extension URLSession.Backport {
@@ -43,7 +43,7 @@ extension URLSession.Backport {
         
         /// Initialize ``AsyncBytes`` with ``URLSession.AsyncBytes``. This path is taken on modern OSs.
         /// - Parameter asyncBytes: The AsyncBytes to read from.
-        @available(macOS 12.0, iOS 15.0, watchOS 8.0, *)
+        @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
         init(_ asyncBytes: URLSession.AsyncBytes) {
             self.task = asyncBytes.task
             self.bytesProvider = asyncBytes.makeAsyncIterator()
